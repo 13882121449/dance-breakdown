@@ -1,0 +1,128 @@
+classDiagram
+    direction LR
+
+    class VideoMeta {
+        +str video_id
+        +int fps
+        +float duration_sec
+        +int total_frames
+        +str status
+    }
+
+    class KeypointSequence {
+        +str video_id
+        +int total_frames
+        +int num_keypoints
+        +np.ndarray data
+        +get_frame(int t) dict
+        +save(path)
+        +load(path) KeypointSequence
+    }
+
+    class ActionSegment {
+        +str action_id
+        +str name
+        +int start_frame
+        +int end_frame
+        +dict annotations
+        +str annotation_source
+        +float start_time_sec
+        +float end_time_sec
+    }
+
+    class AnimationClip {
+        +str clip_name
+        +int start_frame
+        +int end_frame
+        +dict joint_rotations
+        +dict root_positions
+    }
+
+    class ActionMetadata {
+        +str video_id
+        +int fps
+        +int total_frames
+        +dict model
+        +list~ActionSegment~ actions
+        +dict calibration
+        +str keypoints_file
+        +str animation_file
+        +to_json() str
+    }
+
+    class FrameExtractor {
+        +extract(video_path, out_dir, target_fps) VideoMeta
+    }
+
+    class PersonSegmenter {
+        -mp_selfie_segmentation
+        +segment(frames_dir, out_dir) None
+    }
+
+    class PoseEstimator {
+        -mp_pose
+        +estimate(frames_dir, video_meta) KeypointSequence
+    }
+
+    class SequenceSmoother {
+        +smooth(kps, window) KeypointSequence
+    }
+
+    class ActionSegmenter {
+        +segment(kps, fps, beats, onsets) list~ActionSegment~
+        -detect_beats(audio) list~int~
+        -snap_to_beat(boundary, beats) int
+        -compute_energy(kps) ndarray
+    }
+
+    class Retargeter {
+        -retarget_map
+        -model_rest_pose
+        +retarget(kps, model) AnimationClip
+        -bone_direction(p_parent, p_child) vec3
+        -solve_rotation(rest_dir, target_dir) quat
+    }
+
+    class MetadataBuilder {
+        +build(segments, clips, kps_path, anim_path) ActionMetadata
+    }
+
+    class PipelineOrchestrator {
+        +process(video_path) ActionMetadata
+        +get_progress(video_id) dict
+    }
+
+    class VideoService {
+        +upload(file) video_id
+        +start_process(video_id)
+        +get_metadata(video_id) ActionMetadata
+    }
+
+    class AnnotationService {
+        +update_annotation(video_id, action_id, text)
+        +get_actions(video_id) list~ActionSegment~
+    }
+
+    class CalibrationService {
+        +apply_calibration(video_id, calibration) ActionMetadata
+        +get_calibration(video_id) dict
+    }
+
+    PipelineOrchestrator --> FrameExtractor
+    PipelineOrchestrator --> PersonSegmenter
+    PipelineOrchestrator --> PoseEstimator
+    PipelineOrchestrator --> SequenceSmoother
+    PipelineOrchestrator --> ActionSegmenter
+    PipelineOrchestrator --> Retargeter
+    PipelineOrchestrator --> MetadataBuilder
+    PoseEstimator ..> KeypointSequence : 产出
+    SequenceSmoother ..> KeypointSequence
+    ActionSegmenter ..> ActionSegment : 产出
+    Retargeter ..> AnimationClip : 产出
+    MetadataBuilder ..> ActionMetadata : 产出
+    VideoService --> PipelineOrchestrator
+    AnnotationService ..> ActionMetadata
+    CalibrationService ..> ActionMetadata
+    CalibrationService --> Retargeter
+    ActionMetadata *-- ActionSegment
+    ActionMetadata *-- AnimationClip

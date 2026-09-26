@@ -1,0 +1,47 @@
+sequenceDiagram
+    participant U as 用户/前端
+    participant API as FastAPI 路由
+    participant VS as VideoService
+    participant PO as PipelineOrchestrator
+    participant FX as FrameExtractor
+    participant PSEG as PersonSegmenter
+    participant PE as PoseEstimator
+    participant SM as SequenceSmoother
+    participant SG as ActionSegmenter
+    participant RT as Retargeter
+    participant MB as MetadataBuilder
+    participant FS as 文件系统
+
+    U->>API: POST /api/video/upload (multipart)
+    API->>VS: upload(file)
+    VS->>FS: 保存到 uploads/
+    VS-->>API: video_id
+    API-->>U: {video_id}
+
+    U->>API: POST /api/video/{id}/process
+    API->>VS: start_process(video_id)
+    VS->>PO: process(video_path)
+
+    PO->>FX: extract(video, frames/, fps=30)
+    FX-->>PO: VideoMeta{fps, total_frames}
+    PO->>PSEG: segment(frames/, frames_masked/)
+    PSEG-->>PO: 前景人像帧
+    PO->>PE: estimate(frames_masked/, meta)
+    PE-->>PO: KeypointSequence [T,33,4]
+    PO->>SM: smooth(kps)
+    SM-->>PO: KeypointSequence(平滑后)
+
+    par 并行分支（切分与重定向均依赖平滑后 KPS）
+        PO->>SG: segment(kps_smoothed, fps, beats)
+        SG-->>PO: list~ActionSegment~
+    and
+        PO->>RT: retarget(kps_smoothed, model)
+        RT-->>PO: AnimationClip(全量动画帧)
+    end
+
+    PO->>MB: build(segments, clip, kps_path, anim_path)
+    MB-->>PO: ActionMetadata
+    PO->>FS: 写 keypoints/animations/metadata
+    PO-->>VS: ActionMetadata
+    VS-->>API: metadata
+    API-->>U: {video_id, actions:[...]}

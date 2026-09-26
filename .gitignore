@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Node
+node_modules/
+dist/
+*.local
+
+# 运行时生成的数据（保留目录占位符）
+data/uploads/*
+data/frames/*
+data/frames_masked/*
+data/keypoints/*
+data/animations/*
+data/metadata/*
+!data/uploads/.gitkeep
+!data/frames/.gitkeep
+!data/frames_masked/.gitkeep
+!data/keypoints/.gitkeep
+!data/animations/.gitkeep
+!data/metadata/.gitkeep
+
+# 编辑器/系统
+.vscode/
+.idea/
+.DS_Store
+*.log
+
+# mediapipe Tasks 模型文件（运行时下载，不入库）
+backend/models/*.task
+backend/models/*.tflite
