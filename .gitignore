@@ -34,3 +34,16 @@ data/metadata/*
 # mediapipe Tasks 模型文件（运行时下载，不入库）
 backend/models/*.task
 backend/models/*.tflite
+
+# 视频 / 3D 模型 / 权重（大文件或受许可限制，不入库）
+*.mp4
+*.mov
+*.avi
+*.glb
+*.gltf
+*.pkl
+*.pt
+*.pth
+*.ckpt
+*.npy
+*.npz

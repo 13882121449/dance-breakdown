@@ -30,6 +30,11 @@ MODELS = {
         "file": "pose_landmarker_full.task",
         "kind": "task",
     },
+    "pose_heavy": {
+        "url": "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_heavy/float16/1/pose_landmarker_heavy.task",
+        "file": "pose_landmarker_heavy.task",
+        "kind": "task",
+    },
 }
 
 # 备用镜像（ghproxy 类，按顺序尝试）
@@ -95,8 +100,9 @@ def main() -> None:
     keys = {
         "pose_lite": ["pose_lite"],
         "pose_full": ["pose_full"],
+        "pose_heavy": ["pose_heavy"],
         "selfie": ["selfie_segmenter"],
-        "all": ["selfie_segmenter", "pose_lite", "pose_full"],
+        "all": ["selfie_segmenter", "pose_lite", "pose_full", "pose_heavy"],
     }.get(which, [which])
     ok_all = True
     for k in keys:

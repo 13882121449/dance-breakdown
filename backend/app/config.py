@@ -40,8 +40,9 @@ TARGET_FPS: int = 30
 # mediapipe Tasks 模型（新版 Tasks API 需显式提供 .task/.tflite 模型文件）
 # ---------------------------------------------------------------------------
 MODELS_DIR: Path = BASE_DIR / "backend" / "models"
-# 姿态估计模型：lite 版（体积更小、加载更快；full/heavy 可按需替换）
-POSE_LANDMARKER_MODEL: Path = MODELS_DIR / "pose_landmarker_lite.task"
+# 姿态估计模型：heavy 版（精度最高、3D 相对深度抖动最小，舞蹈场景首选）
+# lite 版体积更小、加载更快，适合移动端；full 为均衡档
+POSE_LANDMARKER_MODEL: Path = MODELS_DIR / "pose_landmarker_heavy.task"
 SELFIE_SEGMENTATION_MODEL: Path = MODELS_DIR / "selfie_segmenter.tflite"
 
 # ---------------------------------------------------------------------------

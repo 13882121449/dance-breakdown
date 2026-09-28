@@ -37,7 +37,7 @@ class PoseEstimator:
     def __init__(
         self,
         model_asset_path: Optional[Any] = None,
-        num_poses: int = 1,
+        num_poses: int = 5,
         min_detection_confidence: float = 0.5,
         min_presence_confidence: float = 0.5,
         min_tracking_confidence: float = 0.5,
@@ -57,6 +57,10 @@ class PoseEstimator:
             output_segmentation_masks=False,
         )
         self._landmarker = mp.tasks.vision.PoseLandmarker.create_from_options(options)
+        # 单人锁定跟踪：记录上一帧选中人物的 bbox 中心/面积，跨帧匹配避免跳变
+        self._tracked_center: Optional[tuple[float, float]] = None
+        self._tracked_area: float = 0.0
+        self._lost_frames: int = 0
 
     def estimate(
         self, frames_dir: Any, video_meta: VideoMeta
@@ -102,10 +106,16 @@ class PoseEstimator:
         pose_landmarks = getattr(result, "pose_landmarks", None)
         world_landmarks = getattr(result, "pose_world_landmarks", None)
         if not pose_landmarks:
+            self._lost_frames += 1
+            if self._lost_frames > 30:
+                self._tracked_center = None
+                self._tracked_area = 0.0
             return out
 
-        landmarks = pose_landmarks[0]  # 第一人
-        world = world_landmarks[0] if world_landmarks else None
+        self._lost_frames = 0
+        idx = self._select_person(pose_landmarks)
+        landmarks = pose_landmarks[idx]
+        world = world_landmarks[idx] if world_landmarks and idx < len(world_landmarks) else None
 
         for i in range(MEDIAPIPE_NUM_KEYPOINTS):
             if i >= len(landmarks):
@@ -119,6 +129,44 @@ class PoseEstimator:
                 out[i, 2] = lm.z
             out[i, 3] = getattr(lm, "visibility", 1.0)
         return out
+
+    def _select_person(self, pose_landmarks: list[Any]) -> int:
+        """从多人中锁定「主要人物」：面积最大者，且跨帧跟踪不跳变。"""
+        n = len(pose_landmarks)
+        if n == 1:
+            return 0
+
+        boxes: list[tuple[float, float, float]] = []
+        for lm in pose_landmarks:
+            xs = [p.x for p in lm if getattr(p, "visibility", 1.0) > 0.3]
+            ys = [p.y for p in lm if getattr(p, "visibility", 1.0) > 0.3]
+            if not xs:
+                boxes.append((0.0, 0.0, 0.0))
+                continue
+            cx = (min(xs) + max(xs)) / 2.0
+            cy = (min(ys) + max(ys)) / 2.0
+            area = (max(xs) - min(xs)) * (max(ys) - min(ys))
+            boxes.append((cx, cy, area))
+
+        if self._tracked_center is not None:
+            best, best_score = 0, float("inf")
+            for i, (cx, cy, area) in enumerate(boxes):
+                if area <= 0:
+                    continue
+                dc = (cx - self._tracked_center[0]) ** 2 + (
+                    cy - self._tracked_center[1]
+                ) ** 2
+                da = abs(area - self._tracked_area) / max(self._tracked_area, 1e-6)
+                score = dc + da
+                if score < best_score:
+                    best_score, best = score, i
+        else:
+            best = max(range(n), key=lambda i: boxes[i][2])
+
+        cx, cy, area = boxes[best]
+        self._tracked_center = (cx, cy)
+        self._tracked_area = area
+        return best
 
     def _resolve_model(self, model_asset_path: Optional[Any]) -> Path:
         path = Path(model_asset_path) if model_asset_path is not None else POSE_LANDMARKER_MODEL
